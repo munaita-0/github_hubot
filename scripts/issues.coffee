@@ -9,8 +9,69 @@
 #   These are from the scripting documentation: https://github.com/github/hubot/blob/master/docs/scripting.md
 
 module.exports = (robot) ->
+  github = require('githubot')(robot)
+
   robot.respond /fuck you/i, (msg) ->
     msg.send 'yeah, fuck me'
+
+  robot.respond /list_issues/i, (msg) ->
+    console.log("list_issues called")
+
+    # get days
+    inputs = msg.message.text.split(' ')
+    term = inputs[2]
+
+    subtract_days = 7;
+
+    if term == 'for_a_day'
+      subtract_days = 1
+    else if term == 'for_2_weeks'
+      subtract_days = 2
+    else if term == 'for_3_weeks'
+      subtract_days = 3
+    else if term == 'for_4_weeks'
+      subtract_days = 4
+    else if term == 'for_5_weeks'
+      subtract_days = 5
+    else if term == 'for_6_weeks'
+      subtract_days = 6
+    else if term == 'for_3_weeks'
+      subtract_days = 21
+    else if term == 'for_a_month'
+      subtract_days = 30
+    else if term == 'for_a_year'
+      subtract_days = 365
+
+    # generate message
+    github.get "https://api.github.com/issues?state=all", {}, (issues) ->
+      issues = issues.sort (a,b) -> a.number > b.number
+      texts = []
+      for i in issues
+
+        # get status
+        status = 'closed'
+
+        if i.state == 'open'
+          label_names = []
+          for label in i.labels
+            label_names.push(label.name)
+
+          if label_names.indexOf('ready_for_release') >= 0
+            status = 'ready_for_release'
+          else if label_names.indexOf('in_review') >= 0
+            status = 'in_review'
+          else if label_names.indexOf('work_in_progress') >= 0
+            status = 'work_in_progress'
+          else 
+            status = 'just_assigned'
+
+        # get date threshold
+        threshold = new Date()
+        threshold.setDate(threshold.getDate() - subtract_days)
+
+        if new Date(i.updated_at) > threshold
+          texts.push "[#{i.repository.name} \##{i.number}] #{i.title} (#{status})"
+      msg.send texts.join '\n'
 
   # robot.hear /badger/i, (res) ->
   #   res.send "Badgers? BADGERS? WE DON'T NEED NO STINKIN BADGERS"
